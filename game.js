@@ -5,6 +5,10 @@ const supabaseClient = supabase.createClient(config.SUPABASE_URL, config.SUPABAS
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
+// Set initial canvas size
+canvas.width = 800;
+canvas.height = 600;
+
 // Get DOM elements
 const scoreSubmission = document.getElementById('scoreSubmission');
 const finalScoreSpan = document.getElementById('finalScore');
@@ -22,17 +26,21 @@ let score = 0;
 let gameOver = false;
 let pipeWidth;
 let pipeGap;
+let gameState = 'start'; // 'start', 'playing', 'over'
 
 // Initialize game variables
 function initGame() {
+    const initialY = canvas.height / 2;
     bird = {
         x: canvas.width * 0.2,
-        y: canvas.height / 2,
+        y: initialY,
+        initialY: initialY, // Store initial Y position for floating animation
         velocity: 0,
         gravity: 0.5,
         jump: -8,
         size: Math.min(canvas.width, canvas.height) * 0.05,
-        rotation: 0
+        rotation: 0,
+        floating: true
     };
     
     pipeWidth = canvas.width * 0.1;
@@ -41,6 +49,7 @@ function initGame() {
     particles = [];
     score = 0;
     gameOver = false;
+    gameState = 'start';
 }
 
 // Set initial canvas size
@@ -65,10 +74,28 @@ function resizeCanvas() {
 
 // Initialize game on window load
 window.addEventListener('load', () => {
-    resizeCanvas();
-    initGame();
-    loadLeaderboard();
-    gameLoop();
+    try {
+        console.log('Game loading...'); // Debug log
+        
+        // Set initial canvas size
+        canvas.width = 800;
+        canvas.height = 600;
+        console.log('Canvas size set to:', canvas.width, 'x', canvas.height); // Debug log
+        
+        // Initialize game
+        initGame();
+        console.log('Game initialized, bird:', bird); // Debug log
+        
+        // Load leaderboard
+        loadLeaderboard();
+        
+        // Start game loop
+        console.log('Starting game loop...'); // Debug log
+        gameLoop();
+    } catch (error) {
+        console.error('Error initializing game:', error);
+        alert('Error initializing game. Check console for details.');
+    }
 });
 
 // Handle window resize
@@ -105,12 +132,15 @@ class Particle {
 // Event listeners
 document.addEventListener('keydown', (e) => {
     if (e.code === 'Space' || e.code === 'ArrowUp') {
-        if (gameOver) {
+        if (gameState === 'start') {
+            gameState = 'playing';
+            bird.floating = false;
+        } else if (gameState === 'over') {
             // Only reset if not clicking on the form
             if (!scoreSubmission.contains(document.activeElement)) {
                 resetGame();
             }
-        } else {
+        } else if (gameState === 'playing') {
             bird.velocity = bird.jump;
             // Add particles when bird jumps
             for (let i = 0; i < 10; i++) {
@@ -120,14 +150,17 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-// Update click event listener to ignore clicks on the score submission form
+// Update click event listener
 canvas.addEventListener('click', (e) => {
-    if (gameOver) {
+    if (gameState === 'start') {
+        gameState = 'playing';
+        bird.floating = false;
+    } else if (gameState === 'over') {
         // Only reset if not clicking on the form
         if (!scoreSubmission.contains(e.target)) {
             resetGame();
         }
-    } else {
+    } else if (gameState === 'playing') {
         bird.velocity = bird.jump;
         // Add particles when bird jumps
         for (let i = 0; i < 10; i++) {
@@ -158,7 +191,11 @@ function drawBird() {
     ctx.translate(bird.x + bird.size/2, bird.y + bird.size/2);
     
     // Rotate bird based on velocity
-    bird.rotation = Math.min(Math.PI/4, Math.max(-Math.PI/4, bird.velocity * 0.1));
+    if (gameState === 'playing') {
+        bird.rotation = Math.min(Math.PI/4, Math.max(-Math.PI/4, bird.velocity * 0.1));
+    } else {
+        bird.rotation = 0;
+    }
     ctx.rotate(bird.rotation);
     
     // Bird body
@@ -170,7 +207,7 @@ function drawBird() {
     // Wing
     ctx.fillStyle = '#FFA500';
     ctx.beginPath();
-    ctx.ellipse(-5, -5, bird.size/3, bird.size/4, Math.PI/4, 0, Math.PI * 2);
+    ctx.ellipse(-bird.size/4, -bird.size/4, bird.size/3, bird.size/4, Math.PI/4, 0, Math.PI * 2);
     ctx.fill();
     
     // Eye
@@ -339,6 +376,7 @@ skipButton.addEventListener('click', () => {
 
 // Modify the existing game over handling
 function handleGameOver() {
+    gameState = 'over';
     gameOver = true;
     finalScoreSpan.textContent = score;
     scoreSubmission.style.display = 'block';
@@ -346,12 +384,6 @@ function handleGameOver() {
 
 // Update the collision detection to use the new game over handling
 function update() {
-    if (gameOver) return;
-
-    // Update bird
-    bird.velocity += bird.gravity;
-    bird.y += bird.velocity;
-
     // Update particles
     for (let i = particles.length - 1; i >= 0; i--) {
         particles[i].update();
@@ -360,8 +392,22 @@ function update() {
         }
     }
 
+    if (gameState === 'start') {
+        // Floating animation
+        const floatingOffset = Math.sin(Date.now() / 400) * 10;
+        bird.y = bird.initialY + floatingOffset;
+        bird.rotation = 0;
+        return;
+    }
+
+    if (gameState === 'over') return;
+
+    // Update bird
+    bird.velocity += bird.gravity;
+    bird.y += bird.velocity;
+
     // Check collisions with ground and ceiling
-    if (bird.y + bird.size > canvas.height || bird.y < 0) {
+    if (bird.y + bird.size * 0.8 > canvas.height || bird.y - bird.size * 0.4 < 0) {
         handleGameOver();
         return;
     }
@@ -375,10 +421,30 @@ function update() {
     for (let i = pipes.length - 1; i >= 0; i--) {
         pipes[i].x -= pipeSpeed;
 
-        // Check collision with pipes
-        if (bird.x + bird.size/1.5 > pipes[i].x && 
-            bird.x - bird.size/1.5 < pipes[i].x + pipeWidth &&
-            (bird.y - bird.size/2 < pipes[i].gapY || bird.y + bird.size/2 > pipes[i].gapY + pipeGap)) {
+        // Calculate bird's center point for circular hitbox
+        const birdCenterX = bird.x;
+        const birdCenterY = bird.y;
+        const hitboxRadius = bird.size * 0.3; // Smaller hitbox radius
+
+        // Calculate closest point on pipe to bird center
+        const closestX = Math.max(pipes[i].x, Math.min(birdCenterX, pipes[i].x + pipeWidth));
+        const closestYTop = Math.min(birdCenterY, pipes[i].gapY);
+        const closestYBottom = Math.max(birdCenterY, pipes[i].gapY + pipeGap);
+
+        // Check collision with top pipe
+        const distanceTop = Math.sqrt(
+            Math.pow(birdCenterX - closestX, 2) + 
+            Math.pow(birdCenterY - closestYTop, 2)
+        );
+
+        // Check collision with bottom pipe
+        const distanceBottom = Math.sqrt(
+            Math.pow(birdCenterX - closestX, 2) + 
+            Math.pow(birdCenterY - closestYBottom, 2)
+        );
+
+        // If either distance is less than hitbox radius, collision occurred
+        if (distanceTop < hitboxRadius || distanceBottom < hitboxRadius) {
             handleGameOver();
             return;
         }
@@ -404,10 +470,12 @@ function draw() {
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Draw pipes
-    pipes.forEach(pipe => {
-        drawPipe(pipe.x, pipe.gapY);
-    });
+    // Draw pipes only during gameplay or game over
+    if (gameState === 'playing' || gameState === 'over') {
+        pipes.forEach(pipe => {
+            drawPipe(pipe.x, pipe.gapY);
+        });
+    }
 
     // Draw particles
     particles.forEach(particle => {
@@ -417,14 +485,37 @@ function draw() {
     // Draw bird
     drawBird();
 
-    // Draw score
-    const fontSize = Math.max(20, Math.min(canvas.width, canvas.height) * 0.04);
-    ctx.fillStyle = '#000';
-    ctx.font = `bold ${fontSize}px Arial`;
-    ctx.fillText(`Score: ${score}`, 10, fontSize + 6);
+    // Draw score during gameplay or game over
+    if (gameState === 'playing' || gameState === 'over') {
+        const fontSize = Math.max(20, Math.min(canvas.width, canvas.height) * 0.04);
+        ctx.fillStyle = '#000';
+        ctx.font = `bold ${fontSize}px Arial`;
+        ctx.fillText(`Score: ${score}`, 10, fontSize + 6);
+    }
+
+    // Draw welcome screen
+    if (gameState === 'start') {
+        const messageHeight = canvas.height * 0.15;
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(0, canvas.height/2 - messageHeight, canvas.width, messageHeight * 2);
+        
+        ctx.fillStyle = '#FFF';
+        const titleSize = Math.max(32, Math.min(canvas.width, canvas.height) * 0.08);
+        const instructionSize = Math.max(20, Math.min(canvas.width, canvas.height) * 0.04);
+        
+        ctx.font = `bold ${titleSize}px Arial`;
+        ctx.textAlign = 'center';
+        ctx.fillText('Flappy Bird', canvas.width/2, canvas.height/2);
+        
+        ctx.font = `${instructionSize}px Arial`;
+        ctx.fillText('Click or press Space to start', canvas.width/2, canvas.height/2 + titleSize);
+        
+        // Reset text alignment for other text
+        ctx.textAlign = 'left';
+    }
 
     // Draw game over message
-    if (gameOver) {
+    if (gameState === 'over') {
         const messageHeight = canvas.height * 0.15;
         ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
         ctx.fillRect(0, canvas.height/2 - messageHeight, canvas.width, messageHeight * 2);
@@ -434,15 +525,28 @@ function draw() {
         const restartSize = Math.max(20, Math.min(canvas.width, canvas.height) * 0.04);
         
         ctx.font = `bold ${gameOverSize}px Arial`;
-        ctx.fillText('Game Over!', canvas.width/2 - gameOverSize * 2, canvas.height/2);
-        ctx.font = `bold ${restartSize}px Arial`;
-        ctx.fillText('Click or press Space to restart', canvas.width/2 - restartSize * 5, canvas.height/2 + gameOverSize);
+        ctx.textAlign = 'center';
+        ctx.fillText('Game Over!', canvas.width/2, canvas.height/2);
+        
+        ctx.font = `${restartSize}px Arial`;
+        ctx.fillText('Click or press Space to restart', canvas.width/2, canvas.height/2 + gameOverSize);
+        
+        // Reset text alignment for other text
+        ctx.textAlign = 'left';
     }
 }
 
 // Game loop
 function gameLoop() {
-    update();
-    draw();
-    requestAnimationFrame(gameLoop);
+    try {
+        console.log('Game State:', gameState); // Debug log
+        console.log('Bird Position:', bird ? `x: ${bird.x}, y: ${bird.y}` : 'Bird not initialized'); // Debug log
+        
+        update();
+        draw();
+        requestAnimationFrame(gameLoop);
+    } catch (error) {
+        console.error('Error in game loop:', error);
+        alert('Game error occurred. Check console for details.');
+    }
 } 

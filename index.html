@@ -14,7 +14,6 @@
             align-items: center;
             min-height: 100vh;
             background: linear-gradient(to bottom, #1a1a1a, #4a4a4a);
-            overflow: hidden;
             font-family: Arial, sans-serif;
         }
         .game-wrapper {
@@ -26,18 +25,21 @@
             width: 100%;
         }
         #gameContainer {
+            flex: 1;
+            max-width: 800px;
+            height: 600px;
+            background: #fff;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
             position: relative;
-            width: 800px;
-            aspect-ratio: 3/2;
         }
         canvas {
             display: block;
             width: 100%;
             height: 100%;
-            border: 3px solid #333;
-            border-radius: 10px;
-            box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
             background-color: #87CEEB;
+            image-rendering: pixelated;
         }
         #scoreSubmission {
             display: none;
@@ -46,51 +48,81 @@
             left: 50%;
             transform: translate(-50%, -50%);
             background: rgba(0, 0, 0, 0.9);
-            padding: 20px;
-            border-radius: 10px;
+            padding: 30px;
+            border-radius: 15px;
             text-align: center;
             color: white;
             width: 80%;
             max-width: 300px;
             z-index: 100;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(5px);
+        }
+        #scoreSubmission h2 {
+            margin: 0 0 20px 0;
+            color: #4CAF50;
+            font-size: 24px;
+        }
+        #scoreSubmission p {
+            margin: 0 0 20px 0;
+            font-size: 18px;
         }
         #scoreSubmission input {
             width: 100%;
-            padding: 8px;
+            padding: 12px;
             margin: 10px 0;
-            border: none;
-            border-radius: 5px;
+            border: 2px solid #4CAF50;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.9);
+            font-size: 16px;
+            transition: all 0.3s ease;
+            box-sizing: border-box;
+        }
+        #scoreSubmission input:focus {
+            outline: none;
+            border-color: #45a049;
+            box-shadow: 0 0 5px rgba(76, 175, 80, 0.5);
         }
         #scoreSubmission button {
             background: #4CAF50;
             color: white;
             border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
+            padding: 12px 25px;
+            border-radius: 8px;
             cursor: pointer;
-            margin: 5px;
+            margin: 10px 5px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            min-width: 120px;
         }
         #scoreSubmission button:hover {
             background: #45a049;
+            transform: translateY(-2px);
+        }
+        #scoreSubmission button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        #skipButton {
+            background: #666 !important;
+        }
+        #skipButton:hover {
+            background: #555 !important;
         }
         #leaderboard {
-            background: rgba(0, 0, 0, 0.8);
-            color: white;
+            width: 250px;
+            background: rgba(255, 255, 255, 0.9);
             padding: 20px;
             border-radius: 10px;
-            width: 250px;
-            flex-shrink: 0;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
         }
         .leaderboard-entry {
             display: flex;
             justify-content: space-between;
             margin: 5px 0;
             padding: 8px;
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.1);
             border-radius: 3px;
-        }
-        #skipButton {
-            background: #666;
         }
         @media (max-width: 1200px) {
             .game-wrapper {
@@ -108,7 +140,7 @@
 <body>
     <div class="game-wrapper">
         <div id="gameContainer">
-            <canvas id="gameCanvas" width="800" height="600"></canvas>
+            <canvas id="gameCanvas"></canvas>
             <div id="scoreSubmission">
                 <h2>Game Over!</h2>
                 <p>Your Score: <span id="finalScore">0</span></p>
